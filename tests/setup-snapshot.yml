@@ -1,6 +1,4 @@
----
-- name: Play for setting up snapshots
-  hosts: all
+- hosts: all
   tasks:
     - name: Set facts used by role
       include_role:

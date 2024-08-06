@@ -1,13 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Run playbook 'playbooks/tests_switch_provider.yml'
-  hosts: all
-  tasks:
-    - name: Include the task 'el_repo_setup.yml'
-      include_tasks: tasks/el_repo_setup.yml
+- hosts: all
+  name: Run playbook 'playbooks/tests_switch_provider.yml'
 
-- name: Import the playbook 'playbooks/tests_switch_provider.yml'
-  import_playbook: playbooks/tests_switch_provider.yml
+- import_playbook: playbooks/tests_switch_provider.yml
   when:
     # The test requires NetworkManager and initscripts, therefore it can only
     # run on RHEL/CentOS 7, RHEL/CentOS 8, or Fedora

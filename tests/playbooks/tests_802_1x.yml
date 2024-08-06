@@ -1,17 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Play for testing configuring 802.1x authentication
-  hosts: all
+- hosts: all
   vars:
     interface: 802-1x-test
   tasks:
     - name: "INIT: 802.1x tests"
       debug:
         msg: "##################################################"
-    - name: Include the task 'setup_802.1x.yml'
-      include_tasks: tasks/setup_802.1x.yml
-    - name: Test configuring 802.1x authentication
-      block:
+    - include_tasks: tasks/setup_802.1x.yml
+    - block:
         - name: "TEST: 802.1x profile with private key password and ca cert"
           debug:
             msg: "##################################################"
@@ -38,15 +35,8 @@
                     - none
                   client_cert: /etc/pki/tls/client.pem
                   ca_cert: /etc/pki/tls/cacert.pem
-        - name: Ensure ping command is present
-          package:
-            name: iputils
-            state: present
-            use: "{{ (__network_is_ostree | d(false)) |
-              ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
         - name: "TEST: I can ping the EAP server"
           command: ping -c1 203.0.113.1
-          changed_when: false
         - name: Import network role
           import_role:
             name: linux-system-roles.network
@@ -64,10 +54,9 @@
           copy:
             src: cacert.pem
             dest: /etc/pki/ca-trust/source/anchors/cacert.pem
-            mode: "0644"
+            mode: 0644
         - name: Update ca trust
           command: update-ca-trust
-          changed_when: false
         - name: Import network role
           import_role:
             name: linux-system-roles.network
@@ -89,11 +78,10 @@
                   client_cert: /etc/pki/tls/client.pem
                   private_key_password_flags:
                     - not-required
-                  system_ca_certs: true
+                  system_ca_certs: True
                   domain_suffix_match: example.com
         - name: "TEST: I can ping the EAP server"
           command: ping -c1 203.0.113.1
-          changed_when: false
         - name: Import network role
           import_role:
             name: linux-system-roles.network
@@ -103,15 +91,10 @@
                 persistent_state: absent
                 state: down
 
-        - name: Include the task 'test_802.1x_capath.yml'
-          include_tasks: tasks/test_802.1x_capath.yml
+        - include_tasks: tasks/test_802.1x_capath.yml
       always:
-        - name: Clean up the test device and the connection profile
-          tags:
-            - "tests::cleanup"
-          block:
-            - name: Deactivate the connection and remove the connection profile
-              import_role:
+        - block:
+            - import_role:
                 name: linux-system-roles.network
               vars:
                 network_connections:
@@ -121,9 +104,8 @@
                   - name: br1
                     persistent_state: absent
                     state: down
-              failed_when: false
-            - name: Include the task 'cleanup_802_1x_server.yml'
-              include_tasks: tasks/cleanup_802_1x_server.yml
+              ignore_errors: true
+            - include_tasks: tasks/cleanup_802_1x_server.yml
             - name: Remove test certificates
               file:
                 state: absent
@@ -142,6 +124,5 @@
                 - /etc/pki/ca-trust/source/anchors/cacert.pem
             - name: Update ca trust
               command: update-ca-trust
-              changed_when: false
-            - name: Verify network state restored to default
-              include_tasks: tasks/check_network_dns.yml
+          tags:
+            - "tests::cleanup"

@@ -2,28 +2,14 @@
 ---
 - name: Remove test interfaces
   shell: |
-    set -euxo pipefail
-    exec 1>&2
-    rc=0
-    ip link delete {{ dhcp_interface1 }} || rc="$?"
-    if [ "$rc" != 0 ]; then
-      echo ERROR - could not delete link {{ dhcp_interface1 }} - error "$rc"
-    fi
-    ip link delete {{ dhcp_interface2 }} || rc="$?"
-    if [ "$rc" != 0 ]; then
-      echo ERROR - could not delete link {{ dhcp_interface2 }} - error "$rc"
-    fi
-    ip link delete testbr || rc="$?"
-    if [ "$rc" != 0 ]; then
-      echo ERROR - could not delete link testbr - error "$rc"
-    fi
+    ip link delete {{ dhcp_interface1 }}
+    ip link delete {{ dhcp_interface2 }}
+    ip link delete testbr
   changed_when: false
 
 
 - name: Stop dnsmasq/radvd services
   shell: |
-    set -uxo pipefail
-    exec 1>&2
     pkill -F /run/dhcp_testbr.pid
     rm -rf /run/dhcp_testbr.pid
     rm -rf /run/dhcp_testbr.lease
@@ -31,5 +17,6 @@
         # Stop radvd server
         service radvd stop
         iptables -D INPUT -i testbr -p udp --dport 67:68 --sport 67:68 -j ACCEPT
+
     fi
   changed_when: false

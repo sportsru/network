@@ -23,18 +23,16 @@
   file:
     path: "/etc/pki/tls/my_ca_certs"
     state: directory
-    mode: "0755"
+    mode: 0755
 - name: Copy cacert to ca_path
   copy:
     src: "cacert.pem"
     dest: "/etc/pki/tls/my_ca_certs/cacert.pem"
-    mode: "0644"
+    mode: 0644
 - name: Install openssl (test dependency)
   package:
     name: openssl
     state: present
-    use: "{{ (__network_is_ostree | d(false)) |
-      ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
 - name: Hash cacert
   command: openssl x509 -hash -noout
     -in /etc/pki/tls/my_ca_certs/cacert.pem
@@ -48,11 +46,10 @@
 - name: Get NetworkManager version
   command:
     cmd: rpm -qa NetworkManager
-  # noqa command-instead-of-module
-  register: __network_nm_nvr
+    warn: false
+  register: __network_NM_NVR
   changed_when: false
-- name: Test configuring 802.1x authentication
-  block:
+- block:
     - name: Import network role
       import_role:
         name: linux-system-roles.network
@@ -75,16 +72,9 @@
               private_key_password_flags:
                 - not-required
               ca_path: /etc/pki/tls/my_ca_certs
-    - name: Ensure ping command is present
-      package:
-        name: iputils
-        state: present
-        use: "{{ (__network_is_ostree | d(false)) |
-                 ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
     - name: "TEST: I can ping the EAP server"
       command: ping -c1 203.0.113.1
-      changed_when: false
-    - name: Trigger failure in case the role did not fail
+    - name: trigger failure in case the role did not fail
       fail:
         msg: after test
   rescue:
@@ -94,20 +84,20 @@
       with_items:
         - ansible_failed_result
         - ansible_failed_task
-        - __network_nm_nvr.stdout
+        - __network_NM_NVR.stdout
         - __NM_capath_ignored_NVRs
       changed_when: false
 
     - name: Assert role behavior
       vars:
-        expected_failure: __network_nm_nvr.stdout in __NM_capath_ignored_NVRs
+        expected_failure: __network_NM_NVR.stdout in __NM_capath_ignored_NVRs
         failure: __network_connections_result.failed
       assert:
         that: (failure and expected_failure) or
           (not failure and not expected_failure)
         msg: "Role {{ failure and 'failed' or 'did not fail' }} but was expected
           {{ expected_failure and '' or 'not' }} to fail.
-          NM NVR: {{ __network_nm_nvr.stdout }}"
+          NM NVR: {{ __network_NM_NVR.stdout }}"
     - name: Assert role failure
       assert:
         that: "

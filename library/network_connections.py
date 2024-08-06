@@ -12,7 +12,7 @@ module: network_connections
 author: Thomas Haller (@thom311)
 short_description: module for network role to manage connection profiles
 requirements: [pygobject, dbus, NetworkManager]
-version_added: "2.13.0"
+version_added: "2.0"
 description:
   - "WARNING: Do not use this module directly! It is only for role internal use."
   - |
@@ -22,44 +22,9 @@ description:
     role and currently it is not expected to use this module outside the role.
     Thus, consult README.md for examples for the role.  The requirements are
     only for the NetworkManager (nm) provider.
-options:
-    __debug_flags:
-        description: Flags to use for debugging
-        required: false
-        type: str
-        default: ''
-    force_state_change:
-        description: Force a state change
-        required: false
-        type: bool
-        default: False
-    ignore_errors:
-        description: Ignore errors
-        required: false
-        type: bool
-        default: False
-    __header:
-        description: Header to use in generated files
-        required: true
-        type: str
-    provider:
-        description: Network provider to use - initscripts or nm
-        required: true
-        type: str
-    connections:
-        description: Network configuration options
-        required: false
-        default: []
-        type: list
-        elements: dict
+options: {}
 """
 
-EXAMPLES = """
-network_connections:
-  connections:
-    - name: eth0
-      state: up
-"""
 
 import errno
 import functools
@@ -175,11 +140,9 @@ class SysUtil:
         links = {}
         for ifname in os.listdir("/sys/class/net/"):
             if not os.path.islink("/sys/class/net/" + ifname):
-                # /sys/class/net may contain certain entries
-                # that are not interface names, like
-                # wokeignore:rule=master
-                # 'bonding_master'.
-                # Skip over files that are not links.
+                # /sys/class/net may contain certain entries that are not
+                # interface names, like 'bonding_master'. Skip over files
+                # that are not links.
                 continue
             links[ifname] = {
                 "ifindex": SysUtil._link_read_ifindex(ifname),
@@ -197,7 +160,7 @@ class SysUtil:
             linkinfos = getattr(cls, "_link_infos", None)
         if linkinfos is None:
             try_count = 0
-            last_fetch_linkinfos = None
+            b = None
             while True:
                 try_count += 1
                 try:
@@ -205,11 +168,11 @@ class SysUtil:
                     # and interfaces can be renamed. Try to avoid that by
                     # fetching the info twice and repeat until we get the same
                     # result.
-                    if last_fetch_linkinfos is None:
-                        last_fetch_linkinfos = SysUtil._link_infos_fetch()
+                    if b is None:
+                        b = SysUtil._link_infos_fetch()
                     linkinfos = SysUtil._link_infos_fetch()
-                    if linkinfos != last_fetch_linkinfos:
-                        last_fetch_linkinfos = linkinfos
+                    if linkinfos != b:
+                        b = linkinfos
                         raise Exception(
                             "cannot read stable link-infos. They keep changing"
                         )
@@ -225,15 +188,15 @@ class SysUtil:
     def link_info_find(cls, refresh=False, mac=None, ifname=None):
         if mac is not None:
             mac = Util.mac_norm(mac)
-        for linkinfo in cls.link_infos(refresh).values():
+        for li in cls.link_infos(refresh).values():
             if mac is not None and mac not in [
-                linkinfo.get("perm-address", None),
-                linkinfo.get("address", None),
+                li.get("perm-address", None),
+                li.get("address", None),
             ]:
                 continue
-            if ifname is not None and ifname != linkinfo.get("ifname", None):
+            if ifname is not None and ifname != li.get("ifname", None):
                 continue
-            return linkinfo
+            return li
         return None
 
 
@@ -371,8 +334,6 @@ class IfcfgUtil:
             ifcfg["ONBOOT"] = "no"
 
         ifcfg["DEVICE"] = connection["interface_name"]
-        if connection["cloned_mac"] != "default":
-            ifcfg["MACADDR"] = connection["cloned_mac"]
 
         if connection["type"] == "ethernet":
             ifcfg["TYPE"] = "Ethernet"
@@ -396,7 +357,6 @@ class IfcfgUtil:
             ifcfg["TYPE"] = "Bridge"
         elif connection["type"] == "bond":
             ifcfg["TYPE"] = "Bond"
-            # wokeignore:rule=master
             ifcfg["BONDING_MASTER"] = "yes"
             opts = ["mode=%s" % (connection["bond"]["mode"])]
             if connection["bond"]["miimon"] is not None:
@@ -484,19 +444,16 @@ class IfcfgUtil:
             ifcfg["ETHTOOL_OPTS"] = ethtool_options
 
         if connection["controller"] is not None:
-            controller = ArgUtil.connection_find_controller(
+            m = ArgUtil.connection_find_controller(
                 connection["controller"], connections, idx
             )
             if connection["port_type"] == "bridge":
-                ifcfg["BRIDGE"] = controller
+                ifcfg["BRIDGE"] = m
             elif connection["port_type"] == "bond":
-                # wokeignore:rule=master
-                ifcfg["MASTER"] = controller
-                # wokeignore:rule=slave
+                ifcfg["MASTER"] = m
                 ifcfg["SLAVE"] = "yes"
             elif connection["port_type"] == "team":
-                # wokeignore:rule=master
-                ifcfg["TEAM_MASTER"] = controller
+                ifcfg["TEAM_MASTER"] = m
                 if "TYPE" in ifcfg:
                     del ifcfg["TYPE"]
                 if connection["type"] != "team":
@@ -511,12 +468,8 @@ class IfcfgUtil:
             if connection["zone"]:
                 ifcfg["ZONE"] = connection["zone"]
 
-            addrs4 = [
-                addr for addr in ip["address"] if addr["family"] == socket.AF_INET
-            ]
-            addrs6 = [
-                addr for addr in ip["address"] if addr["family"] == socket.AF_INET6
-            ]
+            addrs4 = [a for a in ip["address"] if a["family"] == socket.AF_INET]
+            addrs6 = [a for a in ip["address"] if a["family"] == socket.AF_INET6]
 
             if ip["dhcp4"]:
                 ifcfg["BOOTPROTO"] = "dhcp"
@@ -550,10 +503,7 @@ class IfcfgUtil:
                 )
                 if len(addrs6) > 1:
                     ifcfg["IPV6ADDR_SECONDARIES"] = " ".join(
-                        [
-                            addr["address"] + "/" + str(addr["prefix"])
-                            for addr in addrs6[1:]
-                        ]
+                        [a["address"] + "/" + str(a["prefix"]) for a in addrs6[1:]]
                     )
             if ip["gateway6"] is not None:
                 ifcfg["IPV6_DEFAULTGW"] = ip["gateway6"]
@@ -573,19 +523,6 @@ class IfcfgUtil:
                 line = r["network"] + "/" + str(r["prefix"])
                 if r["gateway"]:
                     line += " via " + r["gateway"]
-                if connection["interface_name"]:
-                    line += " dev " + connection["interface_name"]
-                else:
-                    warn_fcn(
-                        "The connection {0} does not specify an interface name. "
-                        "Therefore, the route to {1}/{2} will be configured without "
-                        "the output device and the kernel will choose it "
-                        "automatically which might result in an unwanted device being "
-                        "used. To avoid this, specify `interface_name` in the "
-                        "connection appropriately.".format(
-                            connection["name"], r["network"], r["prefix"]
-                        ),
-                    )
                 if r["metric"] != -1:
                     line += " metric " + str(r["metric"])
 
@@ -955,17 +892,13 @@ class NMUtil:
                 if option in ["all_ports_active", "use_carrier", "tlb_dynamic_lb"]:
                     value = int(value)
                 if option in ["all_ports_active", "packets_per_port"]:
-                    # wokeignore:rule=slave
                     option = option.replace("port", "slave")
                 s_bond.add_option(option, str(value))
         elif connection["type"] == "team":
             s_con.set_property(NM.SETTING_CONNECTION_TYPE, NM.SETTING_TEAM_SETTING_NAME)
-        # wokeignore:rule=dummy
         elif connection["type"] == "dummy":
             s_con.set_property(
-                # wokeignore:rule=dummy
-                NM.SETTING_CONNECTION_TYPE,
-                NM.SETTING_DUMMY_SETTING_NAME,
+                NM.SETTING_CONNECTION_TYPE, NM.SETTING_DUMMY_SETTING_NAME
             )
         elif connection["type"] == "vlan":
             s_con.set_property(NM.SETTING_CONNECTION_TYPE, NM.SETTING_VLAN_SETTING_NAME)
@@ -1026,18 +959,6 @@ class NMUtil:
                 )
         else:
             raise MyError("unsupported type %s" % (connection["type"]))
-
-        if connection["cloned_mac"] != "default":
-            if connection["type"] == "wireless":
-                s_wireless = self.connection_ensure_setting(con, NM.SettingWireless)
-                s_wireless.set_property(
-                    NM.SETTING_WIRELESS_CLONED_MAC_ADDRESS, connection["cloned_mac"]
-                )
-            else:
-                s_wired = self.connection_ensure_setting(con, NM.SettingWired)
-                s_wired.set_property(
-                    NM.SETTING_WIRED_CLONED_MAC_ADDRESS, connection["cloned_mac"]
-                )
 
         if "ethernet" in connection:
             if connection["ethernet"]["autoneg"] is not None:
@@ -1110,12 +1031,9 @@ class NMUtil:
 
         if connection["controller"] is not None:
             s_con.set_property(
-                # wokeignore:rule=slave
-                NM.SETTING_CONNECTION_SLAVE_TYPE,
-                connection["port_type"],
+                NM.SETTING_CONNECTION_SLAVE_TYPE, connection["port_type"]
             )
             s_con.set_property(
-                # wokeignore:rule=master
                 NM.SETTING_CONNECTION_MASTER,
                 ArgUtil.connection_find_controller_uuid(
                     connection["controller"], connections, idx
@@ -1215,13 +1133,6 @@ class NMUtil:
                     s_ip6.set_property(NM.SETTING_IP_CONFIG_NEVER_DEFAULT, True)
                     s_ip4.set_property(NM.SETTING_IP_CONFIG_NEVER_DEFAULT, True)
 
-            s_ip4.set_property(
-                NM.SETTING_IP_CONFIG_IGNORE_AUTO_DNS, bool(ip["ipv4_ignore_auto_dns"])
-            )
-            s_ip6.set_property(
-                NM.SETTING_IP_CONFIG_IGNORE_AUTO_DNS, bool(ip["ipv6_ignore_auto_dns"])
-            )
-
             for nameserver in ip["dns"]:
                 if nameserver["family"] == socket.AF_INET6:
                     s_ip6.add_dns(nameserver["address"])
@@ -1252,26 +1163,18 @@ class NMUtil:
                 ):
                     s_ip6.add_route(r)
             for r in ip["route"]:
-                new_route = NM.IPRoute.new(
+                rr = NM.IPRoute.new(
                     r["family"], r["network"], r["prefix"], r["gateway"], r["metric"]
                 )
-                if r["type"]:
-                    NM.IPRoute.set_attribute(
-                        new_route, "type", Util.GLib().Variant("s", r["type"])
-                    )
                 if r["table"]:
                     NM.IPRoute.set_attribute(
-                        new_route, "table", Util.GLib().Variant.new_uint32(r["table"])
-                    )
-                if r["src"]:
-                    NM.IPRoute.set_attribute(
-                        new_route, "src", Util.GLib().Variant.new_string(r["src"])
+                        rr, "table", Util.GLib().Variant.new_uint32(r["table"])
                     )
 
                 if r["family"] == socket.AF_INET:
-                    s_ip4.add_route(new_route)
+                    s_ip4.add_route(rr)
                 else:
-                    s_ip6.add_route(new_route)
+                    s_ip6.add_route(rr)
             for routing_rule in ip["routing_rule"]:
                 nm_routing_rule = NM.IPRoutingRule.new(routing_rule["family"])
                 NM.IPRoutingRule.set_priority(nm_routing_rule, routing_rule["priority"])
@@ -1293,9 +1196,7 @@ class NMUtil:
                         routing_rule["dport"][0],
                         routing_rule["dport"][1],
                     )
-                # In NM, when user specifies `from 0.0.0.0/0`` or `from ::/0` in a
-                # routing rule, NM treats it as if the `from` setting is not specified.
-                if routing_rule["from"] and routing_rule["from"]["prefix"]:
+                if routing_rule["from"]:
                     NM.IPRoutingRule.set_from(
                         nm_routing_rule,
                         routing_rule["from"]["address"],
@@ -1326,9 +1227,7 @@ class NMUtil:
                     )
                 if routing_rule["table"]:
                     NM.IPRoutingRule.set_table(nm_routing_rule, routing_rule["table"])
-                # In NM, when user specifies `to 0.0.0.0/0`` or `to ::/0` in a
-                # routing rule, NM treats it as if the `to` setting is not specified.
-                if routing_rule["to"] and routing_rule["to"]["prefix"]:
+                if routing_rule["to"]:
                     NM.IPRoutingRule.set_to(
                         nm_routing_rule,
                         routing_rule["to"]["address"],
@@ -1497,6 +1396,7 @@ class NMUtil:
         )
 
     def connection_activate(self, connection, timeout=15, wait_time=None):
+
         already_retried = False
 
         while True:
@@ -1723,14 +1623,9 @@ class RunEnvironmentAnsible(RunEnvironment):
     ARGS = {
         "ignore_errors": {"required": False, "default": False, "type": "bool"},
         "force_state_change": {"required": False, "default": False, "type": "bool"},
-        "provider": {"required": True, "type": "str"},
-        "connections": {
-            "required": False,
-            "default": [],
-            "type": "list",
-            "elements": "dict",
-        },
-        "__header": {"required": True, "type": "str"},
+        "provider": {"required": True, "default": None, "type": "str"},
+        "connections": {"required": False, "default": None, "type": "list"},
+        "__header": {"required": True, "default": None, "type": "str"},
         "__debug_flags": {"required": False, "default": "", "type": "str"},
     }
 
@@ -2201,18 +2096,6 @@ class Cmd(object):
 ###############################################################################
 
 
-def version_to_tuple(version):
-    """
-    Translates the dot-separated version string to a tuple
-
-    :param version: The dot-separated version string
-    :return: the version tuple
-    """
-    version_list = version.split(".")
-    version_tuple = tuple(map(int, version_list))
-    return version_tuple
-
-
 class Cmd_nm(Cmd):
     def __init__(self, **kwargs):
         Cmd.__init__(self, **kwargs)
@@ -2242,21 +2125,7 @@ class Cmd_nm(Cmd):
         names = {}
         for idx, connection in enumerate(self.connections):
             self._check_ethtool_setting_support(idx, connection)
-            if connection.get("ip", {}):
-                for route in connection["ip"]["route"]:
-                    if route["type"]:
-                        # The special route type prohibit, blackhole and unreachable
-                        # are only supported in NM since version 1.36.0
-                        nm_client_version = self._nm_provider.get_client_version()
-                        if version_to_tuple(nm_client_version) < (1, 36, 0):
-                            self.log_fatal(
-                                idx,
-                                "route type {0} is only supported in NM since 1.36.0 "
-                                "but the NM client version is {1}".format(
-                                    route["type"],
-                                    nm_client_version,
-                                ),
-                            )
+
             name = connection["name"]
             if not name:
                 if not connection["persistent_state"] == "absent":
@@ -2528,11 +2397,11 @@ class Cmd_nm(Cmd):
             % (
                 con.get_id(),
                 con.get_uuid(),
-                (
-                    "not-active"
-                    if not is_active
-                    else "is-modified" if is_modified else "force-state-change"
-                ),
+                "not-active"
+                if not is_active
+                else "is-modified"
+                if is_modified
+                else "force-state-change",
             ),
         )
         self.connections_data_set_changed(idx)
@@ -2788,11 +2657,11 @@ class Cmd_initscripts(Cmd):
                 "up connection %s (%s)"
                 % (
                     name,
-                    (
-                        "not-active"
-                        if is_active is not True
-                        else "is-modified" if is_modified else "force-state-change"
-                    ),
+                    "not-active"
+                    if is_active is not True
+                    else "is-modified"
+                    if is_modified
+                    else "force-state-change",
                 ),
             )
             cmd = "ifup"

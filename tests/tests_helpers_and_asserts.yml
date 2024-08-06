@@ -3,16 +3,15 @@
 - name: Check that creating and removing test devices and assertions work
   hosts: all
   tasks:
-    - name: Include the task 'el_repo_setup.yml'
-      include_tasks: tasks/el_repo_setup.yml
+    - include_tasks: tasks/el_repo_setup.yml
 
-    - name: Test veth interface management
+    - name: test veth interface management
       include_tasks: tasks/create_and_remove_interface.yml
       vars:
         type: veth
         interface: veth1298
 
-    - name: Test veth interface management
+    - name: test veth interface management
       include_tasks: tasks/create_and_remove_interface.yml
       vars:
         type: dummy

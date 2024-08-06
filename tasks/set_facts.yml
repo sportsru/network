@@ -2,22 +2,10 @@
 ---
 - name: Ensure ansible_facts used by role are present
   setup:
-    gather_subset: "{{ __network_required_facts_subsets }}"
-  when: __network_required_facts |
-    difference(ansible_facts.keys() | list) | length > 0
+    gather_subset: min
+  when: not ansible_facts.keys() | list |
+    intersect(__network_required_facts) == __network_required_facts
   no_log: true
-
-- name: Determine if system is ostree and set flag
-  when: not __network_is_ostree is defined
-  block:
-    - name: Check if system is ostree
-      stat:
-        path: /run/ostree-booted
-      register: __ostree_booted_stat
-
-    - name: Set flag to indicate system is ostree
-      set_fact:
-        __network_is_ostree: "{{ __ostree_booted_stat.stat.exists }}"
 
 - name: Check which services are running
   service_facts:

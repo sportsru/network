@@ -22,7 +22,7 @@ class ArgUtil:
     def connection_find_by_name(name, connections, n_connections=None):
         if not name:
             raise ValueError("missing name argument")
-        conn = None
+        c = None
         for idx, connection in enumerate(connections):
             if n_connections is not None and idx >= n_connections:
                 break
@@ -30,34 +30,34 @@ class ArgUtil:
                 continue
 
             if connection["persistent_state"] == "absent":
-                conn = None
+                c = None
             elif connection["persistent_state"] == "present":
-                conn = connection
-        return conn
+                c = connection
+        return c
 
     @staticmethod
     def connection_find_controller(name, connections, n_connections=None):
-        connection = ArgUtil.connection_find_by_name(name, connections, n_connections)
-        if not connection:
+        c = ArgUtil.connection_find_by_name(name, connections, n_connections)
+        if not c:
             raise MyError("invalid controller/parent '%s'" % (name))
-        if connection["interface_name"] is None:
+        if c["interface_name"] is None:
             raise MyError(
                 "invalid controller/parent '%s' which needs an 'interface_name'"
                 % (name)
             )
-        if not Util.ifname_valid(connection["interface_name"]):
+        if not Util.ifname_valid(c["interface_name"]):
             raise MyError(
                 "invalid controller/parent '%s' with invalid 'interface_name' ('%s')"
-                % (name, connection["interface_name"])
+                % (name, c["interface_name"])
             )
-        return connection["interface_name"]
+        return c["interface_name"]
 
     @staticmethod
     def connection_find_controller_uuid(name, connections, n_connections=None):
-        connection = ArgUtil.connection_find_by_name(name, connections, n_connections)
-        if not connection:
+        c = ArgUtil.connection_find_by_name(name, connections, n_connections)
+        if not c:
             raise MyError("invalid controller/parent '%s'" % (name))
-        return connection["nm.uuid"]
+        return c["nm.uuid"]
 
     @staticmethod
     def connection_get_non_absent_names(connections):
@@ -285,17 +285,17 @@ class ArgValidatorRouteTable(ArgValidator):
                     name,
                     "route table value is {0} but cannot be less than 1".format(value),
                 )
-            elif table > UINT32_MAX:
+            elif table > 0xFFFFFFFF:
                 raise ValidationError(
                     name,
-                    "route table value is {0} but cannot be greater than {1}".format(
-                        value, UINT32_MAX
+                    "route table value is {0} but cannot be greater than 4294967295".format(
+                        value
                     ),
                 )
         if isinstance(table, Util.STRING_TYPE):
             if table == "":
                 raise ValidationError(name, "route table name cannot be empty string")
-            if not IPRouteUtils.ROUTE_TABLE_NAME_REGEX.match(table):
+            if not IPRouteUtils.ROUTE_TABLE_ALIAS_RE.match(table):
                 raise ValidationError(
                     name, "route table name contains invalid characters"
                 )
@@ -477,7 +477,7 @@ class ArgValidatorDict(ArgValidator):
             items = list(value.items())
         except AttributeError:
             raise ValidationError(name, "invalid content is not a dictionary")
-        for setting, value in items:
+        for (setting, value) in items:
             try:
                 validator = self.nested[setting]
             except KeyError:
@@ -493,7 +493,7 @@ class ArgValidatorDict(ArgValidator):
             except ValidationError as e:
                 raise ValidationError(e.name, e.error_message)
             result[setting] = validated_value
-        for setting, validator in self.nested.items():
+        for (setting, validator) in self.nested.items():
             if setting in seen_keys:
                 continue
             if validator.required:
@@ -543,7 +543,7 @@ class ArgValidatorList(ArgValidator):
             value = [s for s in value.split(" ") if s]
 
         result = []
-        for idx, v in enumerate(value):
+        for (idx, v) in enumerate(value):
             if (v is None or v == "") and self.remove_none_or_empty:
                 continue
             try:
@@ -578,34 +578,21 @@ class ArgValidatorIP(ArgValidatorStr):
 
 
 class ArgValidatorMac(ArgValidatorStr):
-    def __init__(
-        self, name, force_len=None, required=False, default_value=None, enum_values=None
-    ):
+    def __init__(self, name, force_len=None, required=False, default_value=None):
         ArgValidatorStr.__init__(self, name, required, default_value, None)
         self.force_len = force_len
-        self.enum_values_mac = enum_values
 
     def _validate_impl(self, value, name):
         v = ArgValidatorStr._validate_impl(self, value, name)
-
-        if self.enum_values_mac is not None and value in self.enum_values_mac:
-            return v
-
         try:
             addr = Util.mac_aton(v, self.force_len)
         except MyError:
-            enum_ex = ""
-            if self.enum_values_mac is not None:
-                enum_ex = " nor one of %s" % (self.enum_values_mac)
             raise ValidationError(
-                name, "value '%s' is not a valid MAC address%s" % (value, enum_ex)
+                name, "value '%s' is not a valid MAC address" % (value)
             )
         if not addr:
-            enum_ex = ""
-            if self.enum_values_mac is not None:
-                enum_ex = " nor one of %s" % (self.enum_values_mac)
             raise ValidationError(
-                name, "value '%s' is not a valid MAC address%s" % (value, enum_ex)
+                name, "value '%s' is not a valid MAC address" % (value)
             )
         return Util.mac_ntoa(addr)
 
@@ -672,17 +659,9 @@ class ArgValidatorIPRoute(ArgValidatorDict):
                     "gateway", family=family, default_value=None, plain_address=False
                 ),
                 ArgValidatorNum(
-                    "metric", default_value=-1, val_min=-1, val_max=UINT32_MAX
-                ),
-                ArgValidatorStr(
-                    "type",
-                    default_value=None,
-                    enum_values=["blackhole", "prohibit", "unreachable"],
+                    "metric", default_value=-1, val_min=-1, val_max=0xFFFFFFFF
                 ),
                 ArgValidatorRouteTable("table"),
-                ArgValidatorIP(
-                    "src", family=family, default_value=None, plain_address=False
-                ),
             ],
             default_value=None,
         )
@@ -696,19 +675,12 @@ class ArgValidatorIPRoute(ArgValidatorDict):
         result["family"] = family
 
         gateway = result["gateway"]
-        route_type = result["type"]
         if gateway is not None:
             if family != gateway["family"]:
                 raise ValidationError(
                     name,
                     "conflicting address family between network and gateway '%s'"
                     % (gateway["address"]),
-                )
-            if route_type is not None:
-                raise ValidationError(
-                    name,
-                    "a %s route can not have a gateway '%s'"
-                    % (route_type, gateway["address"]),
                 )
             result["gateway"] = gateway["address"]
 
@@ -718,16 +690,6 @@ class ArgValidatorIPRoute(ArgValidatorDict):
             result["prefix"] = prefix
         elif not Util.addr_family_valid_prefix(family, prefix):
             raise ValidationError(name, "invalid prefix %s in '%s'" % (prefix, value))
-
-        src = result["src"]
-        if src is not None:
-            if family != src["family"]:
-                raise ValidationError(
-                    name,
-                    "conflicting address family between network and src "
-                    "address {0}".format(src["address"]),
-                )
-            result["src"] = src["address"]
 
         return result
 
@@ -744,7 +706,7 @@ class ArgValidatorIPRoutingRule(ArgValidatorDict):
                     default_value=None,
                     required=True,
                     val_min=0,
-                    val_max=UINT32_MAX,
+                    val_max=0xFFFFFFFF,
                 ),
                 ArgValidatorStr(
                     "action",
@@ -759,10 +721,10 @@ class ArgValidatorIPRoutingRule(ArgValidatorDict):
                 ),
                 ArgValidatorIPAddr("from"),
                 ArgValidatorNum(
-                    "fwmark", default_value=None, val_min=1, val_max=UINT32_MAX
+                    "fwmark", default_value=None, val_min=1, val_max=0xFFFFFFFF
                 ),
                 ArgValidatorNum(
-                    "fwmask", default_value=None, val_min=1, val_max=UINT32_MAX
+                    "fwmask", default_value=None, val_min=1, val_max=0xFFFFFFFF
                 ),
                 ArgValidatorStr("iif", default_value=None),
                 ArgValidatorBool("invert", default_value=False),
@@ -773,7 +735,7 @@ class ArgValidatorIPRoutingRule(ArgValidatorDict):
                 ArgValidatorRouteTable("table"),
                 ArgValidatorIPAddr("to"),
                 ArgValidatorNum("tos", default_value=None, val_min=1, val_max=255),
-                ArgValidatorRange("uid", val_min=0, val_max=UINT32_MAX),
+                ArgValidatorRange("uid", val_min=0, val_max=0xFFFFFFFF),
             ],
             default_value=None,
         )
@@ -804,27 +766,15 @@ class ArgValidatorIPRoutingRule(ArgValidatorDict):
                     name,
                     "missing 'table' for the routing rule",
                 )
-        # `from 0.0.0.0/0` means from all IPv4 addresses
-        # `from ::/0` means from all IPv6 addresses
-        # In NM, if `from` property is not specified in a routing rule, NM
-        # still appends `from 0.0.0.0/0` or `from ::/0` to the rule
-        if result["from"] is not None and result["from"]["address"] not in [
-            "0.0.0.0",
-            "::",
-        ]:
+
+        if result["from"] is not None:
             if result["from"]["prefix"] == 0:
                 raise ValidationError(
                     name,
                     "the prefix length for 'from' cannot be zero",
                 )
 
-        # NM also allows to specify `to 0.0.0.0/0` or `to ::/0` in a routing
-        # rule, but the connection profiles will only show the `from` setting
-        # for the rule
-        if result["to"] is not None and result["to"]["address"] not in [
-            "0.0.0.0",
-            "::",
-        ]:
+        if result["to"] is not None:
             if result["to"]["prefix"] == 0:
                 raise ValidationError(
                     name,
@@ -880,7 +830,6 @@ class ArgValidator_DictIP(ArgValidatorDict):
         r"^ip6-bytestring$",
         r"^ip6-dotint$",
         r"^ndots:([1-9]\d*|0)$",
-        r"^no-aaaa$",
         r"^no-check-names$",
         r"^no-ip6-dotint$",
         r"^no-reload$",
@@ -902,15 +851,13 @@ class ArgValidator_DictIP(ArgValidatorDict):
                 ArgValidatorBool("dhcp4_send_hostname", default_value=None),
                 ArgValidatorIP("gateway4", family=socket.AF_INET),
                 ArgValidatorNum(
-                    "route_metric4", val_min=-1, val_max=UINT32_MAX, default_value=None
+                    "route_metric4", val_min=-1, val_max=0xFFFFFFFF, default_value=None
                 ),
                 ArgValidatorBool("auto6", default_value=None),
-                ArgValidatorBool("ipv4_ignore_auto_dns", default_value=None),
-                ArgValidatorBool("ipv6_ignore_auto_dns", default_value=None),
                 ArgValidatorBool("ipv6_disabled", default_value=None),
                 ArgValidatorIP("gateway6", family=socket.AF_INET6),
                 ArgValidatorNum(
-                    "route_metric6", val_min=-1, val_max=UINT32_MAX, default_value=None
+                    "route_metric6", val_min=-1, val_max=0xFFFFFFFF, default_value=None
                 ),
                 ArgValidatorList(
                     "address",
@@ -958,8 +905,6 @@ class ArgValidator_DictIP(ArgValidatorDict):
                 "gateway4": None,
                 "route_metric4": None,
                 "auto6": True,
-                "ipv4_ignore_auto_dns": None,
-                "ipv6_ignore_auto_dns": None,
                 "ipv6_disabled": False,
                 "gateway6": None,
                 "route_metric6": None,
@@ -979,7 +924,7 @@ class ArgValidator_DictIP(ArgValidatorDict):
     def _validate_post(self, value, name, result):
 
         has_ipv6_addresses = any(
-            addr for addr in result["address"] if addr["family"] == socket.AF_INET6
+            a for a in result["address"] if a["family"] == socket.AF_INET6
         )
 
         if result["ipv6_disabled"] is True:
@@ -1010,7 +955,7 @@ class ArgValidator_DictIP(ArgValidatorDict):
 
         if result["dhcp4"] is None:
             result["dhcp4"] = result["dhcp4_send_hostname"] is not None or not any(
-                addr for addr in result["address"] if addr["family"] == socket.AF_INET
+                a for a in result["address"] if a["family"] == socket.AF_INET
             )
 
         if result["auto6"] is None:
@@ -1046,7 +991,7 @@ class ArgValidator_DictEthernet(ArgValidatorDict):
             nested=[
                 ArgValidatorBool("autoneg", default_value=None),
                 ArgValidatorNum(
-                    "speed", val_min=0, val_max=UINT32_MAX, default_value=0
+                    "speed", val_min=0, val_max=0xFFFFFFFF, default_value=0
                 ),
                 ArgValidatorStr(
                     "duplex", enum_values=["half", "full"], default_value=None
@@ -1680,7 +1625,7 @@ class ArgValidator_DictMacvlan(ArgValidatorDict):
 
 class ArgValidatorPath(ArgValidatorStr):
     """
-    Validates that the value is a valid posix absolute path
+    Valides that the value is a valid posix absolute path
     """
 
     def __init__(self, name, required=False, default_value=None):
@@ -1836,7 +1781,6 @@ class ArgValidator_DictConnection(ArgValidatorDict):
         "vlan",
         "macvlan",
         "wireless",
-        # wokeignore:rule=dummy
         "dummy",
     ]
     VALID_PORT_TYPES = ["bridge", "bond", "team"]
@@ -1871,28 +1815,15 @@ class ArgValidator_DictConnection(ArgValidatorDict):
                     enum_values=ArgValidator_DictConnection.VALID_PORT_TYPES,
                 ),
                 ArgValidatorDeprecated(
-                    # wokeignore:rule=slave
                     "slave_type",
                     deprecated_by="port_type",
                 ),
                 ArgValidatorStr("controller"),
-                # wokeignore:rule=master
                 ArgValidatorDeprecated("master", deprecated_by="controller"),
                 ArgValidatorStr("interface_name", allow_empty=True),
                 ArgValidatorMac("mac"),
-                ArgValidatorMac(
-                    "cloned_mac",
-                    enum_values=[
-                        "default",
-                        "preserve",
-                        "permanent",
-                        "random",
-                        "stable",
-                    ],
-                    default_value="default",
-                ),
                 ArgValidatorNum(
-                    "mtu", val_min=0, val_max=UINT32_MAX, default_value=None
+                    "mtu", val_min=0, val_max=0xFFFFFFFF, default_value=None
                 ),
                 ArgValidatorStr("zone"),
                 ArgValidatorBool("check_iface_exists", default_value=True),
@@ -2012,10 +1943,10 @@ class ArgValidator_DictConnection(ArgValidatorDict):
         # FIXME: Maybe just accept all values, even if they are not
         # needed/meaningful in the respective context
         valid_fields = set(valid_fields)
-        for key in result:
-            if key not in valid_fields:
+        for k in result:
+            if k not in valid_fields:
                 raise ValidationError(
-                    name + "." + key,
+                    name + "." + k,
                     "property is not allowed for state '%s' and persistent_state '%s'"
                     % (state, persistent_state),
                 )
@@ -2503,19 +2434,6 @@ class ArgValidator_ListConnections(ArgValidatorList):
                     "if you need to use initscripts.",
                 )
 
-        # initscripts does not support ip.ipv4_ignore_auto_dns or
-        # ip.ipv6_ignore_auto_dns, so raise errors when network
-        # provider is initscripts
-        if (
-            connection["ip"]["ipv4_ignore_auto_dns"] is not None
-            or connection["ip"]["ipv6_ignore_auto_dns"] is not None
-        ):
-            if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS:
-                raise ValidationError.from_connection(
-                    idx,
-                    "ip.ipv4_ignore_auto_dns or ip.ipv6_ignore_auto_dns is not "
-                    "supported by initscripts.",
-                )
         # initscripts does not support ip.dns_options, so raise errors when network
         # provider is initscripts
         if connection["ip"]["dns_options"]:
@@ -2632,20 +2550,6 @@ class ArgValidator_ListConnections(ArgValidatorList):
                         "NetworkManger until NM 1.30",
                     )
 
-        if connection["ip"]["route"]:
-            if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS:
-                for route in connection["ip"]["route"]:
-                    if route["type"] is not None:
-                        raise ValidationError.from_connection(
-                            idx,
-                            "type is not supported by initscripts",
-                        )
-                    if route["src"] is not None:
-                        raise ValidationError.from_connection(
-                            idx,
-                            "configuring the route source is not supported by initscripts",
-                        )
-
         if connection["ip"]["routing_rule"]:
             if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS:
                 raise ValidationError.from_connection(
@@ -2673,17 +2577,6 @@ class ArgValidator_ListConnections(ArgValidatorList):
                             "NetworkManger until NM 1.34",
                         )
 
-        if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS and connection["cloned_mac"] in [
-            "preserve",
-            "permanent",
-            "random",
-            "stable",
-        ]:
-            raise ValidationError.from_connection(
-                idx,
-                "Non-MAC argument is not supported by initscripts.",
-            )
-
         self.validate_route_tables(connection, idx)
 
 
@@ -2697,8 +2590,7 @@ class IPRouteUtils(object):
     # certain set of ASCII characters. These aliases are what we accept
     # as input (in the playbook), and there is no need to accept
     # user input with unusual characters or non-ASCII names.
-    _ROUTE_TABLE_NAME_PATTERN = "[a-zA-Z0-9_.-]+"
-    ROUTE_TABLE_NAME_REGEX = re.compile("^" + _ROUTE_TABLE_NAME_PATTERN + "$")
+    ROUTE_TABLE_ALIAS_RE = re.compile("^[a-zA-Z0-9_.-]+$")
 
     @classmethod
     def _parse_route_tables_mapping(cls, file_content, mapping):
@@ -2709,13 +2601,7 @@ class IPRouteUtils(object):
         # It is thus similar to rtnl_rttable_a2n(), from here:
         # https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/tree/lib/rt_names.c?id=11e41a635cfab54e8e02fbff2a03715467e77ae9#n447
         regex = re.compile(
-            b"^\\s*"  # optional leading whitespace
-            b"(0x[0-9a-fA-F]+|[0-9]+)"  # table ID in hex or decimal (non negative)
-            b"\\s+"  # whitespace
-            b"("  # make a pattern group for the table name
-            + cls._ROUTE_TABLE_NAME_PATTERN.encode("ascii")
-            + b")"  # close pattern group
-            b"(\\s*|\\s+#.*)$"  # trailing whitespace or comment
+            b"^\\s*(0x[0-9a-fA-F]+|[0-9]+)\\s+([a-zA-Z0-9_.-]+)(\\s*|\\s+#.*)$"
         )
         for line in file_content.split(b"\n"):
 
@@ -2724,13 +2610,25 @@ class IPRouteUtils(object):
                 continue
 
             table = rmatch.group(1)
-            name = rmatch.group(2).decode("ascii")
+            name = rmatch.group(2)
 
-            if table.startswith(b"0x"):
-                tableid = int(table, 16)
-            else:
+            name = name.decode("utf-8")
+
+            if not cls.ROUTE_TABLE_ALIAS_RE.match(name):
+                raise AssertionError(
+                    "bug: table alias contains unexpected characters: %s" % (name,)
+                )
+
+            tableid = None
+            try:
                 tableid = int(table)
-            if tableid > UINT32_MAX:
+            except Exception:
+                if table.startswith(b"0x"):
+                    try:
+                        tableid = int(table[2:], 16)
+                    except Exception:
+                        pass
+            if tableid is None or tableid < 0 or tableid > 0xFFFFFFFF:
                 continue
 
             # In case of duplicates, the latter wins. That is unlike iproute2's

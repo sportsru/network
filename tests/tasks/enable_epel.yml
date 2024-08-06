@@ -1,16 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Create EPEL yum repo and Enable EPEL
-  when:
-    - ansible_distribution in ['RedHat', 'CentOS']
-    - ansible_distribution_major_version in ['7', '8']
-  block:
+- block:
     - name: Create EPEL {{ ansible_distribution_major_version }}
-      command:
-        cmd: >-
-          rpm -iv https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{
-          ansible_distribution_major_version }}.noarch.rpm
-        # noqa command-instead-of-module
+      # yamllint disable-line rule:line-length
+      command: rpm -iv https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm
+      args:
+        warn: false
         creates: /etc/yum.repos.d/epel.repo
       register: __epel_status
       # sometimes the rpm download returns a 403 - I think it is when too
@@ -21,21 +16,20 @@
       retries: 6
       delay: 10
 
-    - name: Install yum-utils package
-      package:
-        state: present
-        name: yum-utils
-      when: ansible_distribution_major_version == '7'
-
     - name: Enable EPEL 7
       command: yum-config-manager --enable epel
       when: ansible_distribution_major_version == '7'
-      changed_when: false
+      args:
+        warn: false
 
     - name: Enable EPEL 8
       command: dnf config-manager --set-enabled epel
       when: ansible_distribution_major_version == '8'
-      changed_when: false
+      args:
+        warn: false
+  when:
+    - ansible_distribution in ['RedHat', 'CentOS']
+    - ansible_distribution_major_version in ['7', '8']
 
 - name: Enable EPEL 6
   copy:

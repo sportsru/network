@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Manage network MAC VLAN
-  hosts: network-test
+- hosts: network-test
   vars:
     network_connections:
+
       - name: eth0
         type: ethernet
         state: up
@@ -19,8 +19,8 @@
         parent: eth0
         macvlan:
           mode: bridge
-          promiscuous: true
-          tap: false
+          promiscuous: True
+          tap: False
         ip:
           address:
             - 192.168.1.1/24

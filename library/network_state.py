@@ -9,7 +9,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: network_state
-version_added: "2.13.0"
+version_added: "2.9"
 short_description: module for network role to apply network state configuration
 description:
     - This module allows to apply the network state configuration through nmstate,
@@ -22,19 +22,6 @@ options:
 author: "Wen Liang (@liangwen12year)"
 """
 
-EXAMPLES = r"""
-network_state:
-  desired_state:
-    dns-resolver:
-      config:
-        search:
-          - example.com
-          - example.org
-        server:
-          - 2001:4860:4860::8888
-          - 8.8.8.8
-"""
-
 RETURN = r"""
 state:
     description: Network state after running the module
@@ -42,18 +29,8 @@ state:
     returned: always
 """
 
-import traceback
-
-from ansible.module_utils.basic import AnsibleModule, missing_required_lib
-
-try:
-    import libnmstate  # pylint: disable=import-error
-except ImportError:
-    NETWORK_HAS_NMSTATE = False
-    NETWORK_NMSTATE_IMPORT_ERROR = traceback.format_exc()
-else:
-    NETWORK_HAS_NMSTATE = True
-    NETWORK_NMSTATE_IMPORT_ERROR = None
+from ansible.module_utils.basic import AnsibleModule
+import libnmstate  # pylint: disable=import-error
 
 
 class NetworkState:
@@ -93,12 +70,6 @@ def run_module():
     module = AnsibleModule(
         argument_spec=module_args,
     )
-
-    if not NETWORK_HAS_NMSTATE:
-        module.fail_json(
-            msg=missing_required_lib("libnmstate"),
-            exception=NETWORK_NMSTATE_IMPORT_ERROR,
-        )
 
     network_state_module = NetworkState(module, "network_state")
     network_state_module.run()

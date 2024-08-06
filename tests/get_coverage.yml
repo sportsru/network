@@ -6,7 +6,7 @@
   tasks:
     # Use set_fact to set variables to make them available in all plays
     # 'vars:' Would only set variables for the current play
-    - name: Set facts
+    - name: set facts
       set_fact:
         coverage_module: network_connections
         coverage: /root/.local/bin/coverage
@@ -14,56 +14,55 @@
 
     # This uses variables from the other set_fact task, therefore it needs to
     # be its own task
-    - name: Set more facts
+    - name: set more facts
       set_fact:
         coverage_file:
           # yamllint disable-line rule:line-length
-          ansible-coverage-{{ coverage_module }}-{{ test_playbook | replace('.yml', '') }}
+          ansible-coverage-{{ coverage_module }}-{{ test_playbook|replace('.yml', '') }}
 
-    - name: Debug info
+    - name: debug info
       debug:
         msg:
           # yamllint disable-line rule:line-length
           Getting coverage for '{{ coverage_module }}' with '{{ test_playbook }}'
 
-    - name: Combine data in case old data is left there
+    - name: combine data in case old data is left there
       command: "{{ coverage }} combine"
       environment:
         COVERAGE_FILE: "{{ coverage_file }}"
-      failed_when: false
+      ignore_errors: yes
       changed_when: false
 
-    - name: Remove old data
+    - name: remove old data
       file:
         state: absent
         path: "{{ coverage_file }}"
 
-    - name: Find coverage files to delete
+    - name: find coverage files to delete
       find:
         path: "{{ ansible_env.HOME }}"
         patterns: ".coverage.*"
-        hidden: true
+        hidden: yes
       register: files_to_delete
 
-    - name: Remove old data
+    - name: remove old data
       file:
         path: "{{ item.path }}"
         state: absent
       with_items: "{{ files_to_delete.files }}"
 
-    - name: Copy coveragerc
+    - name: copy coveragerc
       copy:
         content: "[run]\ndisable_warnings = no-data-collected\n"
         dest: .coveragerc
         mode: "0644"
 
-    - name: Install latest pip
+    - name: install latest pip
       pip:
         name: coverage
         extra_args: --user --upgrade
 
-- name: Import the playbook '{{ test_playbook }}'
-  import_playbook: "{{ test_playbook }}"
+- import_playbook: "{{ test_playbook }}"
   vars:
     ansible_python_interpreter:
       # yamllint disable-line rule:line-length
@@ -72,7 +71,7 @@
 - name: Gather coverage data
   hosts: all
   tasks:
-    - name: Gather coverage data
+    - name: gather coverage data
       shell: "{{ coverage }} combine .coverage.*"
       environment:
         COVERAGE_FILE: "{{ coverage_file }}"
@@ -85,4 +84,4 @@
       fetch:
         src: "{{ coverage_file }}"
         dest: "{{ destdir }}"
-        flat: false
+        flat: no

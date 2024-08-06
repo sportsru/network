@@ -189,8 +189,6 @@ class TestValidator(Python26CompatTestCase):
                 "ipv6_disabled": False,
                 "dhcp4": True,
                 "address": [],
-                "ipv4_ignore_auto_dns": None,
-                "ipv6_ignore_auto_dns": None,
                 "auto_gateway": None,
                 "route_append_only": False,
                 "rule_append_only": False,
@@ -204,7 +202,6 @@ class TestValidator(Python26CompatTestCase):
                 "dns_search": [],
             },
             "mac": None,
-            "cloned_mac": "default",
             "match": {},
             "controller": None,
             "ieee802_1x": None,
@@ -237,9 +234,7 @@ class TestValidator(Python26CompatTestCase):
                 "prefix": int(r.get_prefix()),
                 "gateway": r.get_next_hop(),
                 "metric": int(r.get_metric()),
-                "type": r.get_attribute("type"),
                 "table": r.get_attribute("table"),
-                "src": r.get_attribute("src"),
             }
             for r in route_list_new
         ]
@@ -277,35 +272,21 @@ class TestValidator(Python26CompatTestCase):
                     s6.clear_routes()
                     for r in kwargs["nm_route_list_current"][idx]:
                         r = parser.validate(r)
-                        new_route = NM.IPRoute.new(
+                        rr = NM.IPRoute.new(
                             r["family"],
                             r["network"],
                             r["prefix"],
                             r["gateway"],
                             r["metric"],
                         )
-                        if r["type"]:
-                            NM.IPRoute.set_attribute(
-                                new_route,
-                                "type",
-                                Util.GLib().Variant("s", r["type"]),
-                            )
                         if r["table"]:
                             NM.IPRoute.set_attribute(
-                                new_route,
-                                "table",
-                                Util.GLib().Variant.new_uint32(r["table"]),
-                            )
-                        if r["src"]:
-                            NM.IPRoute.set_attribute(
-                                new_route,
-                                "src",
-                                Util.GLib().Variant.new_uint32(r["src"]),
+                                rr, "table", Util.GLib().Variant.new_uint32(r["table"])
                             )
                         if r["family"] == socket.AF_INET:
-                            s4.add_route(new_route)
+                            s4.add_route(rr)
                         else:
-                            s6.add_route(new_route)
+                            s6.add_route(rr)
                     con_new = nmutil.connection_create(
                         connections, idx, connection_current=con_new
                     )
@@ -335,19 +316,13 @@ class TestValidator(Python26CompatTestCase):
             content_current = kwargs.get("initscripts_content_current", None)
             if content_current:
                 content_current = content_current[idx]
-            warnings = []
-            config = IfcfgUtil.ifcfg_create(
-                connections,
-                idx,
-                content_current=content_current,
-                warn_fcn=warnings.append,
+            c = IfcfgUtil.ifcfg_create(
+                connections, idx, content_current=content_current
             )
             # pprint("con[%s] = \"%s\"" % (idx, connections[idx]['name']), c)
-            expected_config = kwargs.get("initscripts_dict_expected", None)
-            if expected_config is not None:
-                self.assertEqual(expected_config[idx], config)
-            expected_warnings = kwargs.get("initscripts_expected_warnings", [])
-            self.assertEqual(expected_warnings, warnings)
+            exp = kwargs.get("initscripts_dict_expected", None)
+            if exp is not None:
+                self.assertEqual(exp[idx], c)
 
     def do_connections_validate(
         self, expected_connections, input_connections, **kwargs
@@ -604,8 +579,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -619,7 +592,6 @@ class TestValidator(Python26CompatTestCase):
                         "dns_search": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -665,8 +637,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -680,7 +650,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -720,8 +689,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -735,7 +702,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -825,8 +791,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "192.168.174.5",
                             }
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -834,7 +798,6 @@ class TestValidator(Python26CompatTestCase):
                         "routing_rule": [],
                     },
                     "mac": "52:54:00:44:9f:ba",
-                    "cloned_mac": "default",
                     "controller": None,
                     "ieee802_1x": None,
                     "wireless": None,
@@ -896,8 +859,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "192.168.174.5",
                             }
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -905,7 +866,6 @@ class TestValidator(Python26CompatTestCase):
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -970,8 +930,6 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 32,
                             },
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -985,7 +943,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "controller": None,
                     "ieee802_1x": None,
                     "wireless": None,
@@ -1070,8 +1027,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "192.168.177.5",
                             },
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1088,7 +1043,6 @@ class TestValidator(Python26CompatTestCase):
                         "dns": [],
                     },
                     "mac": "52:54:00:44:9f:ba",
-                    "cloned_mac": "default",
                     "controller": None,
                     "ieee802_1x": None,
                     "wireless": None,
@@ -1137,8 +1091,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "a:b:c::6",
                             },
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1149,15 +1101,12 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 24,
                                 "gateway": None,
                                 "metric": -1,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             }
                         ],
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "controller": None,
                     "ieee802_1x": None,
                     "wireless": None,
@@ -1229,8 +1178,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dns": [],
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": True,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1238,7 +1185,6 @@ class TestValidator(Python26CompatTestCase):
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -1310,8 +1256,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dns": [],
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": False,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1319,7 +1263,6 @@ class TestValidator(Python26CompatTestCase):
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -1411,8 +1354,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "192.168.177.5",
                             },
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1430,7 +1371,6 @@ class TestValidator(Python26CompatTestCase):
                         "dns": [],
                     },
                     "mac": "52:54:00:44:9f:ba",
-                    "cloned_mac": "default",
                     "controller": None,
                     "ieee802_1x": None,
                     "wireless": None,
@@ -1479,8 +1419,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "a:b:c::6",
                             },
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1491,15 +1429,12 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 24,
                                 "gateway": None,
                                 "metric": -1,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             }
                         ],
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "controller": None,
                     "ieee802_1x": None,
                     "wireless": None,
@@ -1568,8 +1503,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "192.168.122.3",
                             }
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1587,7 +1520,6 @@ class TestValidator(Python26CompatTestCase):
                         "dns": [],
                     },
                     "mac": "33:24:10:24:2f:b9",
-                    "cloned_mac": "default",
                     "controller": None,
                     "ieee802_1x": None,
                     "wireless": None,
@@ -1630,8 +1562,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "192.168.244.1",
                             }
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1642,15 +1572,12 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 24,
                                 "gateway": None,
                                 "metric": -1,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             }
                         ],
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "macvlan": {"mode": "bridge", "promiscuous": True, "tap": False},
                     "controller": None,
                     "ieee802_1x": None,
@@ -1694,8 +1621,6 @@ class TestValidator(Python26CompatTestCase):
                                 "address": "192.168.245.7",
                             }
                         ],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1706,15 +1631,12 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 24,
                                 "gateway": None,
                                 "metric": -1,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             }
                         ],
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "macvlan": {"mode": "passthru", "promiscuous": False, "tap": True},
                     "controller": None,
                     "ieee802_1x": None,
@@ -1789,8 +1711,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": "bridge2",
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": False,
                         "dhcp4": False,
@@ -1810,7 +1730,6 @@ class TestValidator(Python26CompatTestCase):
                         "rule_append_only": False,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -1836,8 +1755,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": "eth1",
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": True,
                         "dhcp4": True,
@@ -1857,7 +1774,6 @@ class TestValidator(Python26CompatTestCase):
                         "rule_append_only": False,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": "prod2",
                     "ieee802_1x": None,
@@ -1946,8 +1862,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dns": [],
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -1955,7 +1869,6 @@ class TestValidator(Python26CompatTestCase):
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2029,8 +1942,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dns": [],
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -2038,7 +1949,6 @@ class TestValidator(Python26CompatTestCase):
                         "routing_rule": [],
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2083,8 +1993,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": None,
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -2104,7 +2012,6 @@ class TestValidator(Python26CompatTestCase):
                         "dns_search": [],
                     },
                     "mac": "aa:bb:cc:dd:ee:ff",
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2143,8 +2050,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -2158,7 +2063,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2219,8 +2123,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": "6643-controller",
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": True,
                         "ipv6_disabled": False,
@@ -2240,7 +2142,6 @@ class TestValidator(Python26CompatTestCase):
                         "rule_append_only": False,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2266,8 +2167,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": "6643",
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": True,
                         "dhcp4_send_hostname": None,
@@ -2287,7 +2186,6 @@ class TestValidator(Python26CompatTestCase):
                         "rule_append_only": False,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": "6643-controller",
                     "ieee802_1x": None,
@@ -2329,8 +2227,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": None,
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": True,
                         "dhcp4": True,
@@ -2350,7 +2246,6 @@ class TestValidator(Python26CompatTestCase):
                         "rule_append_only": False,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2409,8 +2304,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": None,
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": True,
                         "dhcp4": True,
@@ -2431,7 +2324,6 @@ class TestValidator(Python26CompatTestCase):
                     },
                     "mac": "11:22:33:44:55:66:77:88:99:00:"
                     "11:22:33:44:55:66:77:88:99:00",
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2495,8 +2387,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": "ib0",
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": True,
                         "dhcp4": True,
@@ -2516,7 +2406,6 @@ class TestValidator(Python26CompatTestCase):
                         "rule_append_only": False,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2541,8 +2430,6 @@ class TestValidator(Python26CompatTestCase):
                     "interface_name": None,
                     "ip": {
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "auto6": True,
                         "dhcp4": True,
@@ -2563,7 +2450,6 @@ class TestValidator(Python26CompatTestCase):
                     },
                     "mac": "11:22:33:44:55:66:77:88:99:00:"
                     "11:22:33:44:55:66:77:88:99:00",
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2658,8 +2544,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -2670,9 +2554,7 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 24,
                                 "gateway": None,
                                 "metric": 545,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             },
                             {
                                 "family": socket.AF_INET,
@@ -2680,9 +2562,7 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 30,
                                 "gateway": None,
                                 "metric": -1,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             },
                         ],
                         "routing_rule": [],
@@ -2694,7 +2574,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2737,7 +2616,7 @@ class TestValidator(Python26CompatTestCase):
                         "DEVICE": "555",
                     },
                     "keys": None,
-                    "route": "192.168.45.0/24 dev 555 metric 545\n192.168.46.0/30 dev 555\n",
+                    "route": "192.168.45.0/24 metric 545\n192.168.46.0/30\n",
                     "route6": None,
                     "rule": None,
                     "rule6": None,
@@ -2766,8 +2645,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": True,
                         "rule_append_only": False,
@@ -2778,9 +2655,7 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 24,
                                 "gateway": None,
                                 "metric": 545,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             },
                             {
                                 "family": socket.AF_INET,
@@ -2788,9 +2663,7 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 30,
                                 "gateway": None,
                                 "metric": -1,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             },
                             {
                                 "family": socket.AF_INET6,
@@ -2798,9 +2671,7 @@ class TestValidator(Python26CompatTestCase):
                                 "prefix": 64,
                                 "gateway": None,
                                 "metric": -1,
-                                "type": None,
                                 "table": None,
-                                "src": None,
                             },
                         ],
                         "routing_rule": [],
@@ -2812,7 +2683,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -2834,166 +2704,6 @@ class TestValidator(Python26CompatTestCase):
                     "state": "up",
                     "type": "ethernet",
                     "zone": "external",
-                    "ip": {
-                        "dns_search": ["aa", "bb"],
-                        "route_append_only": True,
-                        "rule_append_only": False,
-                        "route": [
-                            {"network": "192.168.45.0", "metric": 545},
-                            {"network": "192.168.46.0", "prefix": 30},
-                            {"network": "a:b:c:d::"},
-                        ],
-                    },
-                }
-            ],
-            nm_route_list_current=[
-                [
-                    {"network": "192.168.40.0", "prefix": 24, "metric": 545},
-                    {"network": "192.168.46.0", "prefix": 30},
-                    {"network": "a:b:c:f::"},
-                ]
-            ],
-            nm_route_list_expected=[
-                [
-                    {"network": "192.168.40.0", "prefix": 24, "metric": 545},
-                    {"network": "192.168.46.0", "prefix": 30},
-                    {"network": "192.168.45.0", "prefix": 24, "metric": 545},
-                    {"network": "a:b:c:f::"},
-                    {"network": "a:b:c:d::"},
-                ]
-            ],
-            initscripts_content_current=[
-                {
-                    "ifcfg": "",
-                    "keys": None,
-                    "route": "192.168.40.0/24 dev e556 metric 545\n192.168.46.0/30",
-                    "route6": "a:b:c:f::/64",
-                    "rule": None,
-                    "rule6": None,
-                }
-            ],
-            initscripts_dict_expected=[
-                {
-                    "ifcfg": {
-                        "BOOTPROTO": "dhcp",
-                        "DOMAIN": "aa bb",
-                        "IPV6INIT": "yes",
-                        "IPV6_AUTOCONF": "yes",
-                        "NM_CONTROLLED": "no",
-                        "ONBOOT": "yes",
-                        "TYPE": "Ethernet",
-                        "ZONE": "external",
-                        "DEVICE": "e556",
-                    },
-                    "keys": None,
-                    "route": "192.168.40.0/24 dev e556 metric 545\n"
-                    "192.168.46.0/30\n"
-                    "192.168.45.0/24 dev e556 metric 545\n"
-                    "192.168.46.0/30 dev e556\n",
-                    "route6": "a:b:c:f::/64\na:b:c:d::/64 dev e556\n",
-                    "rule": None,
-                    "rule6": None,
-                }
-            ],
-        )
-
-    def test_route_without_interface_name(self):
-        route_device_warning = (
-            "The connection e556 does not specify an interface name. Therefore, the "
-            "route to {0} will be configured without the output device and the kernel "
-            "will choose it automatically which might result in an unwanted device "
-            "being used. To avoid this, specify `interface_name` in the connection "
-            "appropriately."
-        )
-        self.maxDiff = None
-        self.do_connections_validate(
-            [
-                {
-                    "actions": ["present", "up"],
-                    "autoconnect": True,
-                    "check_iface_exists": True,
-                    "ethernet": ETHERNET_DEFAULTS,
-                    "ethtool": ETHTOOL_DEFAULTS,
-                    "force_state_change": None,
-                    "ignore_errors": None,
-                    "interface_name": None,
-                    "ip": {
-                        "gateway6": None,
-                        "gateway4": None,
-                        "route_metric4": None,
-                        "auto6": True,
-                        "ipv6_disabled": False,
-                        "dhcp4": True,
-                        "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
-                        "auto_gateway": None,
-                        "route_append_only": True,
-                        "rule_append_only": False,
-                        "route": [
-                            {
-                                "family": socket.AF_INET,
-                                "network": "192.168.45.0",
-                                "prefix": 24,
-                                "gateway": None,
-                                "metric": 545,
-                                "type": None,
-                                "table": None,
-                                "src": None,
-                            },
-                            {
-                                "family": socket.AF_INET,
-                                "network": "192.168.46.0",
-                                "prefix": 30,
-                                "gateway": None,
-                                "metric": -1,
-                                "type": None,
-                                "table": None,
-                                "src": None,
-                            },
-                            {
-                                "family": socket.AF_INET6,
-                                "network": "a:b:c:d::",
-                                "prefix": 64,
-                                "gateway": None,
-                                "metric": -1,
-                                "type": None,
-                                "table": None,
-                                "src": None,
-                            },
-                        ],
-                        "routing_rule": [],
-                        "dns": [],
-                        "dns_options": [],
-                        "dns_priority": 0,
-                        "dns_search": ["aa", "bb"],
-                        "route_metric6": None,
-                        "dhcp4_send_hostname": None,
-                    },
-                    "mac": "12:23:34:45:56:60",
-                    "cloned_mac": "default",
-                    "match": {},
-                    "controller": None,
-                    "ieee802_1x": None,
-                    "wireless": None,
-                    "mtu": None,
-                    "name": "e556",
-                    "parent": None,
-                    "persistent_state": "present",
-                    "port_type": None,
-                    "state": "up",
-                    "type": "ethernet",
-                    "wait": None,
-                    "zone": "external",
-                }
-            ],
-            [
-                {
-                    "name": "e556",
-                    "state": "up",
-                    "type": "ethernet",
-                    "zone": "external",
-                    "mac": "12:23:34:45:56:60",
                     "ip": {
                         "dns_search": ["aa", "bb"],
                         "route_append_only": True,
@@ -3037,27 +2747,21 @@ class TestValidator(Python26CompatTestCase):
                     "ifcfg": {
                         "BOOTPROTO": "dhcp",
                         "DOMAIN": "aa bb",
-                        "HWADDR": "12:23:34:45:56:60",
                         "IPV6INIT": "yes",
                         "IPV6_AUTOCONF": "yes",
                         "NM_CONTROLLED": "no",
                         "ONBOOT": "yes",
                         "TYPE": "Ethernet",
                         "ZONE": "external",
+                        "DEVICE": "e556",
                     },
                     "keys": None,
-                    "route": "192.168.40.0/24 metric 545\n"
-                    "192.168.46.0/30\n"
+                    "route": "192.168.40.0/24 metric 545\n192.168.46.0/30\n"
                     "192.168.45.0/24 metric 545\n",
                     "route6": "a:b:c:f::/64\na:b:c:d::/64\n",
                     "rule": None,
                     "rule6": None,
                 }
-            ],
-            initscripts_expected_warnings=[
-                route_device_warning.format("192.168.45.0/24"),
-                route_device_warning.format("192.168.46.0/30"),
-                route_device_warning.format("a:b:c:d::/64"),
             ],
         )
 
@@ -3085,8 +2789,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -3100,7 +2802,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": {
@@ -3169,8 +2870,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -3184,7 +2883,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": {
@@ -3253,8 +2951,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -3268,7 +2964,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": {
@@ -3335,8 +3030,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -3350,7 +3043,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": None,
@@ -3407,8 +3099,6 @@ class TestValidator(Python26CompatTestCase):
                         "ipv6_disabled": False,
                         "dhcp4": True,
                         "address": [],
-                        "ipv4_ignore_auto_dns": None,
-                        "ipv6_ignore_auto_dns": None,
                         "auto_gateway": None,
                         "route_append_only": False,
                         "rule_append_only": False,
@@ -3422,7 +3112,6 @@ class TestValidator(Python26CompatTestCase):
                         "dhcp4_send_hostname": None,
                     },
                     "mac": None,
-                    "cloned_mac": "default",
                     "match": {},
                     "controller": None,
                     "ieee802_1x": {
@@ -4215,9 +3904,6 @@ class TestValidator(Python26CompatTestCase):
         true_testcase_12 = {
             "dns_options": ["use-vc"],
         }
-        true_testcase_13 = {
-            "dns_options": ["no-aaaa"],
-        }
 
         self.assertEqual(
             validator.validate(true_testcase_1)["dns_options"], ["attempts:3"]
@@ -4252,9 +3938,6 @@ class TestValidator(Python26CompatTestCase):
         )
         self.assertEqual(
             validator.validate(true_testcase_12)["dns_options"], ["use-vc"]
-        )
-        self.assertEqual(
-            validator.validate(true_testcase_13)["dns_options"], ["no-aaaa"]
         )
 
     def test_ipv4_dns_without_ipv4_config(self):
@@ -4508,10 +4191,8 @@ class TestValidator(Python26CompatTestCase):
             route_metric6_configured_ipv6_disabled,
         )
 
-    # wokeignore:rule=master
     def test_set_deprecated_master(self):
         """
-        wokeignore:rule=master
         When passing the deprecated "master" it is updated to "controller".
         """
         input_connections = [
@@ -4525,20 +4206,17 @@ class TestValidator(Python26CompatTestCase):
                 "state": "up",
                 "type": "ethernet",
                 "interface_name": "eth1",
-                "master": "prod2",  # wokeignore:rule=master
+                "master": "prod2",
             },
         ]
         connections = ARGS_CONNECTIONS.validate(input_connections)
         self.assertTrue(len(connections) == 2)
         for connection in connections:
             self.assertTrue("controller" in connection)
-            # wokeignore:rule=master
             self.assertTrue("master" not in connection)
 
-    # wokeignore:rule=slave
     def test_set_deprecated_slave_type(self):
         """
-        wokeignore:rule=slave
         When passing the deprecated "slave_type" it is updated to "port_type".
         """
         input_connections = [
@@ -4553,36 +4231,14 @@ class TestValidator(Python26CompatTestCase):
                 "type": "ethernet",
                 "interface_name": "eth1",
                 "controller": "prod2",
-                "slave_type": "bridge",  # wokeignore:rule=slave
+                "slave_type": "bridge",
             },
         ]
         connections = ARGS_CONNECTIONS.validate(input_connections)
         self.assertTrue(len(connections) == 2)
         for connection in connections:
             self.assertTrue("port_type" in connection)
-            # wokeignore:rule=slave
             self.assertTrue("slave_type" not in connection)
-
-    def test_validate_ignore_auto_dns(self):
-        """
-        Test and validate a connection profile with ipv4_ignore_auto_dns and
-        ipv6_ignore_auto_dns enabled.
-        """
-        validator = network_lsr.argument_validator.ArgValidator_ListConnections()
-        test_ignore_auto_dns = [
-            {
-                "name": "ignore_auto_dns",
-                "type": "ethernet",
-                "ip": {
-                    "auto6": True,
-                    "dhcp4": True,
-                    "ipv4_ignore_auto_dns": True,
-                    "ipv6_ignore_auto_dns": True,
-                },
-            }
-        ]
-
-        validator.validate(test_ignore_auto_dns)
 
 
 @my_test_skipIf(nmutil is None, "no support for NM (libnm via pygobject)")
@@ -4685,7 +4341,7 @@ class TestValidatorMatch(Python26CompatTestCase):
         result = self.validator.validate(self.test_profile)
         self.assertEqual(result["match"], {"path": ["pci-0000:00:03.0"]})
 
-        self.test_profile["type"] = "dummy"  # wokeignore:rule=dummy
+        self.test_profile["type"] = "dummy"
         self.assertRaisesRegex(
             ValidationError,
             "'match.path' settings are only supported for type 'ethernet' or 'infiniband'",
@@ -4932,14 +4588,11 @@ class TestValidatorRouteTable(Python26CompatTestCase):
 
         self.assertEqual(parse(b""), {})
         self.assertEqual(parse(b"5x"), {})
-        self.assertEqual(parse(b"5x x"), {})
-        self.assertEqual(parse(b"0x x"), {})
-        self.assertEqual(parse(b"-1 x"), {})
-        self.assertEqual(parse(b"0x100000000 x"), {})
         self.assertEqual(parse(b"0xF5 x"), {"x": 0xF5})
         self.assertEqual(parse(b"0x5a x"), {"x": 0x5A})
         self.assertEqual(parse(b" 0x5a x"), {"x": 0x5A})
         self.assertEqual(parse(b"0x0 x"), {"x": 0x0})
+        self.assertEqual(parse(b"0x x"), {})
         self.assertEqual(parse(b"5 x"), {"x": 5})
         self.assertEqual(parse(b"   7   y   "), {"y": 7})
         self.assertEqual(parse(b"5 x\n0x4 y"), {"x": 5, "y": 4})
@@ -5003,41 +4656,6 @@ class TestValidatorRouteTable(Python26CompatTestCase):
             self.test_connections[0],
             self.connection_index,
         )
-
-    def test_type_route_with_gateway(self):
-        """
-        Test that the route type route can not have a gateway
-        """
-
-        self.test_connections[0]["ip"]["route"][0]["type"] = "blackhole"
-        self.assertRaisesRegex(
-            ValidationError,
-            "a {0} route can not have a gateway '{1}'".format(
-                self.test_connections[0]["ip"]["route"][0]["type"],
-                self.test_connections[0]["ip"]["route"][0]["gateway"],
-            ),
-            self.validator.validate,
-            self.test_connections,
-        )
-
-    def test_route_with_source_address(self):
-        """
-        Test setting the route with src address specified
-        """
-        self.test_connections[0]["ip"]["route"][0]["src"] = "2001:db8::2"
-        self.assertRaisesRegex(
-            ValidationError,
-            "conflicting address family between network and src "
-            "address {0}".format(
-                self.test_connections[0]["ip"]["route"][0]["src"],
-            ),
-            self.validator.validate,
-            self.test_connections,
-        )
-
-        self.test_connections[0]["ip"]["route"][0]["src"] = "198.51.100.3"
-        result = self.validator.validate(self.test_connections)
-        self.assertEqual(result[0]["ip"]["route"][0]["src"], "198.51.100.3")
 
 
 class TestValidatorRoutingRules(Python26CompatTestCase):
@@ -5125,14 +4743,6 @@ class TestValidatorRoutingRules(Python26CompatTestCase):
             self.validator.validate,
             self.test_connections,
         )
-        self.test_connections[0]["ip"]["routing_rule"][0]["from"] = "::/0"
-        self.test_connections[0]["ip"]["routing_rule"][0]["to"] = "::/0"
-        self.validator.validate(self.test_connections)
-
-        self.test_connections[0]["ip"]["routing_rule"][0]["family"] = "ipv4"
-        self.test_connections[0]["ip"]["routing_rule"][0]["from"] = "0.0.0.0/0"
-        self.test_connections[0]["ip"]["routing_rule"][0]["to"] = "0.0.0.0/0"
-        self.validator.validate(self.test_connections)
 
     def test_routing_rule_missing_table(self):
         """
@@ -5308,6 +4918,7 @@ class TestValidatorDictBond(Python26CompatTestCase):
         ]
 
     def test_invalid_bond_option_ad(self):
+
         """
         Test the ad bond option restrictions
         """

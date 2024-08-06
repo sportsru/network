@@ -4,23 +4,11 @@
   package:
     name: dnsmasq
     state: present
-    use: "{{ (__network_is_ostree | d(false)) |
-      ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
-  register: __install_status
-  # sometimes the rpm download returns a 403 - I think it is when too
-  # many parallel jobs attempt the download from the same controller in
-  # too short a period of time, so the epel server throttles additional
-  # downloads - use a retry here to mitigate
-  until: __install_status is success
-  retries: 6
-  delay: 10
 
 - name: Install pgrep, sysctl
   package:
     name: procps
     state: present
-    use: "{{ (__network_is_ostree | d(false)) |
-      ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
   when:
     - ansible_os_family == 'RedHat'
     - ansible_distribution_major_version is version('6', '<=')
@@ -29,16 +17,13 @@
   package:
     name: procps-ng
     state: present
-    use: "{{ (__network_is_ostree | d(false)) |
-      ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
   when:
     - ansible_os_family == 'RedHat'
     - ansible_distribution_major_version is version('7', '>=')
 
 - name: Create test interfaces
   shell: |
-    set -euxo pipefail
-    exec 1>&2
+    set -euo pipefail
     ip link add {{ dhcp_interface1 }} type veth peer name {{ dhcp_interface1 }}p
     ip link add {{ dhcp_interface2 }} type veth peer name {{ dhcp_interface2 }}p
     if [ -n "$(pgrep NetworkManager)" ];then
@@ -64,23 +49,10 @@
     while ! ip addr show testbr | grep -q 'inet [1-9]'
     do
         let "timer+=1"
-        if [ $timer -eq 30 ]; then
-          echo ERROR - could not add testbr
-          ip addr
-          exit 1
-        fi
+        if [ $timer -eq 30 ]; then break; fi
         sleep 1
-        rc=0
-        ip addr add 192.0.2.1/24 dev testbr || rc="$?"
-        if [ "$rc" != 0 ]; then
-          echo NOTICE - could not add testbr - error code "$rc"
-          continue
-        fi
-        ip -6 addr add 2001:DB8::1/32 dev testbr || rc="$?"
-        if [ "$rc" != 0 ]; then
-          echo NOTICE - could not add testbr - error code "$rc"
-          continue
-        fi
+        ip addr add 192.0.2.1/24 dev testbr
+        ip -6 addr add 2001:DB8::1/32 dev testbr
     done
 
     if grep 'release 6' /etc/redhat-release; then

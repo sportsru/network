@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/bash -x
 
-set -euxo pipefail
+set -euo pipefail
 
 TEST_SOURCE_DIR="/network-role"
 C8S_CONTAINER_IMAGE="quay.io/linux-system-roles/c8s-network-role"
@@ -16,7 +16,6 @@ EXCLUDE_TESTS_C7='
 -e tests/tests_auto_gateway_initscripts.yml
 -e tests/tests_bond_deprecated_initscripts.yml
 -e tests/tests_bond_initscripts.yml
--e tests/tests_bond_cloned_mac_initscripts.yml
 -e tests/tests_bond_removal_initscripts.yml
 -e tests/tests_infiniband_nm.yml
 -e tests/tests_team_nm.yml
@@ -32,7 +31,6 @@ EXCLUDE_TESTS_C8S='
 -e tests/tests_auto_gateway_initscripts.yml
 -e tests/tests_bond_deprecated_initscripts.yml
 -e tests/tests_bond_initscripts.yml
--e tests/tests_bond_cloned_mac_initscripts.yml
 -e tests/tests_bond_removal_initscripts.yml
 -e tests/tests_infiniband_nm.yml
 -e tests/tests_integration_pytest.yml
@@ -82,23 +80,20 @@ done
 case $OS_TYPE in
 "c8s")
     CONTAINER_IMAGE=$C8S_CONTAINER_IMAGE
-    # shellcheck disable=SC2086
     read -r -d '' TEST_FILES <<EOF || :
-    $(find tests/tests_*.yml | grep -E -v ${EXCLUDE_TESTS_C8S})
+    $(find tests/tests_*.yml | egrep -v ${EXCLUDE_TESTS_C8S})
 EOF
     ;;
 "c7")
     CONTAINER_IMAGE=$C7_CONTAINER_IMAGE
-    # shellcheck disable=SC2086
     read -r -d '' TEST_FILES <<EOF || :
-    $(find tests/tests_*.yml | grep -E -v ${EXCLUDE_TESTS_C7})
+    $(find tests/tests_*.yml | egrep -v ${EXCLUDE_TESTS_C7})
 EOF
     ;;
 "c9s")
     CONTAINER_IMAGE=$C9S_CONTAINER_IMAGE
-    # shellcheck disable=SC2086
     read -r -d '' TEST_FILES <<EOF || :
-    $(find tests/tests_*.yml | grep -E -v ${EXCLUDE_TESTS_C9S})
+    $(find tests/tests_*.yml | egrep -v ${EXCLUDE_TESTS_C9S})
 EOF
     ;;
 *)
@@ -154,14 +149,6 @@ podman exec -i "$CONTAINER_ID" \
     /bin/bash -c  \
         'cat /dev/zero | ssh-keygen -q -N "";
          cp -v /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys'
-
-for req in meta/collection-requirements.yml tests/collection-requirements.yml; do
-    podman exec -i "$CONTAINER_ID" \
-        /bin/bash -c  \
-            "if [ -f $TEST_SOURCE_DIR/$req ]; then \
-                 ansible-galaxy collection install -vv -r $TEST_SOURCE_DIR/$req; \
-             fi"
-done
 
 for test_file in $TEST_FILES; do
     podman exec -i "$CONTAINER_ID" \

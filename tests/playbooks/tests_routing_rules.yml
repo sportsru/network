@@ -1,24 +1,23 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Test for testing routing rules
+- hosts: all
+
+- name: Test configuring ethernet devices
   hosts: all
   vars:
     type: veth
     interface: ethtest0
 
   tasks:
-    - name: "Set type={{ type }} and interface={{ interface }}"  # noqa name
+    - name: "set type={{ type }} and interface={{ interface }}"
       set_fact:
         type: "{{ type }}"
         interface: "{{ interface }}"
-    - name: Include the task 'show_interfaces.yml'
-      include_tasks: tasks/show_interfaces.yml
-    - name: Include the task 'manage_test_interface.yml'
-      include_tasks: tasks/manage_test_interface.yml
+    - include_tasks: tasks/show_interfaces.yml
+    - include_tasks: tasks/manage_test_interface.yml
       vars:
         state: present
-    - name: Include the task 'assert_device_present.yml'
-      include_tasks: tasks/assert_device_present.yml
+    - include_tasks: tasks/assert_device_present.yml
 
     - name: Create a dedicated test file in `/etc/iproute2/rt_tables.d/` and
             add a new routing table
@@ -26,7 +25,7 @@
         path: /etc/iproute2/rt_tables.d/table.conf
         line: "200 custom"
         mode: "0644"
-        create: true
+        create: yes
 
     - name: Configure connection profile and specify the numeric table in
         static routes
@@ -38,9 +37,9 @@
             interface_name: "{{ interface }}"
             state: up
             type: ethernet
-            autoconnect: true
+            autoconnect: yes
             ip:
-              dhcp4: false
+              dhcp4: no
               address:
                 - 198.51.100.3/26
                 - 2001:db8::2/32
@@ -92,21 +91,13 @@
                   family: ipv4
                   oif: oiftest
                   table: 30400
-                - priority: 30403
-                  from: 0.0.0.0/0
-                  to: 0.0.0.0/0
-                  table: 30400
                 - priority: 30600
                   to: 2001:db8::4/32
                   table: 30600
                 - priority: 30601
                   family: ipv6
                   dport: 128 - 256
-                  invert: true
-                  table: 30600
-                - priority: 30602
-                  from: ::/0
-                  to: ::/0
+                  invert: True
                   table: 30600
                 - priority: 200
                   from: 198.51.100.56/26
@@ -117,41 +108,41 @@
     - name: Get the routing rule for looking up the table 30200
       command: ip rule list table 30200
       register: route_rule_table_30200
-      ignore_errors: true
+      ignore_errors: yes
       changed_when: false
       when: ansible_distribution_major_version != "7"
 
     - name: Get the routing rule for looking up the table 30400
       command: ip rule list table 30400
       register: route_rule_table_30400
-      ignore_errors: true
+      ignore_errors: yes
       changed_when: false
       when: ansible_distribution_major_version != "7"
 
     - name: Get the routing rule for looking up the table 30600
       command: ip -6 rule list table 30600
       register: route_rule_table_30600
-      ignore_errors: true
+      ignore_errors: yes
       changed_when: false
       when: ansible_distribution_major_version != "7"
 
     - name: Get the routing rule for looking up the table 'custom'
       command: ip rule list table custom
       register: route_rule_table_custom
-      ignore_errors: true
+      ignore_errors: yes
       changed_when: false
       when: ansible_distribution_major_version != "7"
 
     - name: Get the IPv4 routing rule for the connection "{{ interface }}"
       command: nmcli -f ipv4.routing-rules c show "{{ interface }}"
       register: connection_route_rule
-      ignore_errors: true
+      ignore_errors: yes
       changed_when: false
 
     - name: Get the IPv6 routing rule for the connection "{{ interface }}"
       command: nmcli -f ipv6.routing-rules c show "{{ interface }}"
       register: connection_route_rule6
-      ignore_errors: true
+      ignore_errors: yes
       changed_when: false
 
     - name: Assert that the routing rule with table lookup 30200 matches the
@@ -208,8 +199,8 @@
           specified rule"
       when: ansible_distribution_major_version != "7"
 
-    - name: Assert that the specified IPv4 routing rule was configured in the
-        connection "{{ interface }}"
+    - name: Assert that the IPv4 routing rule in the connection
+        "{{ interface }}" matches the specified rule
       assert:
         that:
           - connection_route_rule.stdout is search("priority 30200 from
@@ -228,15 +219,13 @@
             0.0.0.0/0 iif iiftest table 30400")
           - connection_route_rule.stdout is search("priority 30402 from
             0.0.0.0/0 oif oiftest table 30400")
-          - connection_route_rule.stdout is search("priority 30403 from
-            0.0.0.0/0 table 30400")
           - connection_route_rule.stdout is search("priority 200 from
             198.51.100.56/26 table 200")
-        msg: "the specified IPv4 routing rule was not configured in the
-          connection '{{ interface }}'"
+        msg: "the IPv4 routing rule in the connection '{{ interface }}' does
+          not match the specified rule"
 
-    - name: Assert that the specified IPv6 routing rule was configured in the
-        connection "{{ interface }}"
+    - name: Assert that the IPv6 routing rule in the connection
+        "{{ interface }}" matches the specified rule
       assert:
         that:
           - connection_route_rule6.stdout is search("priority 30600 to
@@ -245,34 +234,26 @@
             ::/0 dport 128-256 table 30600") or
             connection_route_rule6.stdout is search("not priority 30601 from
             ::/0 dport 128-256 table 30600")
-          - connection_route_rule6.stdout is search("priority 30602 from
-            ::/0 table 30600")
-        msg: "the specified IPv6 routing rule was not configured in the
-          connection '{{ interface }}'"
+        msg: "the IPv6 routing rule in the connection '{{ interface }}' does
+          not match the specified rule"
 
     - name: Remove the dedicated test file in `/etc/iproute2/rt_tables.d/`
       file:
         state: absent
         path: /etc/iproute2/rt_tables.d/table.conf
 
-- name: Import the playbook 'down_profile+delete_interface.yml'
-  import_playbook: down_profile+delete_interface.yml
+- import_playbook: down_profile+delete_interface.yml
   vars:
     profile: "{{ interface }}"
 # FIXME: assert profile/device down
-- name: Import the playbook 'remove_profile.yml'
-  import_playbook: remove_profile.yml
+- import_playbook: remove_profile.yml
   vars:
     profile: "{{ interface }}"
 - name: Assert device and profile are absent
   hosts: all
   tasks:
-    - name: Include the task 'assert_profile_absent.yml'
-      include_tasks: tasks/assert_profile_absent.yml
+    - include_tasks: tasks/assert_profile_absent.yml
       vars:
         profile: "{{ interface }}"
-    - name: Include the task 'assert_device_absent.yml'
-      include_tasks: tasks/assert_device_absent.yml
-    - name: Verify network state restored to default
-      include_tasks: tasks/check_network_dns.yml
+    - include_tasks: tasks/assert_device_absent.yml
 ...

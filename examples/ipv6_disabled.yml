@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Disable ipv6
-  hosts: all
+- hosts: all
   vars:
     network_connections:
       - name: eth0
@@ -10,3 +9,4 @@
           ipv6_disabled: true
   roles:
     - linux-system-roles.network
+...

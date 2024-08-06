@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Manage network using match path for interface
-  hosts: all
+- hosts: all
   vars:
     network_connections:
       - name: eth0
@@ -10,8 +9,9 @@
           path:
             - pci-0000:00:03.0
         ip:
-          dhcp4: false
+          dhcp4: no
           address:
             - 192.0.2.3/24
   roles:
     - linux-system-roles.network
+...

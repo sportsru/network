@@ -1,9 +1,7 @@
 ---
-- name: Play for testing DNS search setting
-  hosts: all
+- hosts: all
   tasks:
-    - name: Test DNS search setting
-      block:
+    - block:
         - name: Configure the static IPv4 address and not configure the IPv6
             address
           import_role:
@@ -23,13 +21,13 @@
         - name: Get DNS search entry for IPv4
           command: nmcli -f ipv4.dns-search connection show br-example
           register: ipv4_dns_search
-          ignore_errors: true
+          ignore_errors: yes
           changed_when: false
 
         - name: Get DNS search entry for IPv6
           command: nmcli -f ipv6.dns-search connection show br-example
           register: ipv6_dns_search
-          ignore_errors: true
+          ignore_errors: yes
           changed_when: false
 
         - name: Assert that IPv4 DNS search entry is configured correctly
@@ -69,7 +67,7 @@
         - name: Get DNS search entry for IPv6
           command: nmcli -f ipv6.dns-search connection show br-example
           register: ipv6_dns_search_static
-          ignore_errors: true
+          ignore_errors: yes
           changed_when: false
 
         - name: Assert that DNS search setting for IPv6 is configured when
@@ -101,7 +99,7 @@
         - name: Get DNS search entry for IPv6
           command: nmcli -f ipv6.dns-search connection show br-example
           register: ipv6_dns_search_static_only
-          ignore_errors: true
+          ignore_errors: yes
           changed_when: false
 
         - name: Assert that DNS search setting for IPv6 is configured when only
@@ -148,18 +146,14 @@
           when: ansible_distribution_major_version | int > 7
 
       always:
-        - name: Clean up the test device and the connection profile
-          tags:
-            - "tests::cleanup"
-          block:
-            - name: Deactivate the connection and remove the connection profile
-              import_role:
+        - block:
+            - import_role:
                 name: linux-system-roles.network
               vars:
                 network_connections:
                   - name: br-example
                     persistent_state: absent
                     state: down
-              failed_when: false
-            - name: Verify network state restored to default
-              include_tasks: tasks/check_network_dns.yml
+              ignore_errors: true
+          tags:
+            - "tests::cleanup"

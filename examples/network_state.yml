@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Manage network using network_state
-  hosts: all
+- hosts: all
   vars:
     network_state:
       interfaces:
@@ -49,3 +48,4 @@
             - 8.8.8.8
   roles:
     - linux-system-roles.network
+...

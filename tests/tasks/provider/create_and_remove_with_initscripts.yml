@@ -9,7 +9,7 @@
         state: up
         persistent_state: present
         type: ethernet
-        autoconnect: true
+        autoconnect: yes
         ip:
           address: 192.0.2.1/24
     network_provider: initscripts

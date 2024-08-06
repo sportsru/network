@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # SPDX-License-Identifier: BSD-3-Clause
 
 if [ -n "${DEBUG}" ]

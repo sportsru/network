@@ -1,19 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Play for testing wireless plugin installation
-  hosts: all
+- hosts: all
   tasks:
-    - name: Check if test can run on ostree systems
-      include_tasks: tasks/ostree_systems_check.yml
-      vars:
-        package: NetworkManager-wifi
-
-    - name: Remove the NetworkManager-wifi package
+    - name: remove the NetworkManager-wifi package
       package:
         name: "NetworkManager-wifi"
         state: absent
 
-    - name: "Get the rpm package facts"
+    - name: "get the rpm package facts"
       package_facts:
         manager: "auto"
 
@@ -23,11 +17,10 @@
           - "'NetworkManager-wifi' not in ansible_facts.packages"
         msg: "NetworkManager-wifi is not removed before wirelss configuration"
 
-    - name: "Wireless configuration"
+    - name: "wireless configuration"
       include_role:
         name: linux-system-roles.network
       vars:
-        network_allow_restart: true
         network_connections:
           - name: wlan0
             type: wireless
@@ -36,7 +29,7 @@
               key_mgmt: "wpa-psk"
               password: "p@55w0rD"
 
-    - name: "Get the rpm package facts"
+    - name: "get the rpm package facts"
       package_facts:
         manager: "auto"
 
@@ -45,6 +38,3 @@
         that:
           - "'NetworkManager-wifi' in ansible_facts.packages"
         msg: "NetworkManager-wifi is not installed after wireless configured"
-
-    - name: Verify network state restored to default
-      include_tasks: tasks/check_network_dns.yml

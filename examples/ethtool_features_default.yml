@@ -1,10 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ---
-- name: Manage ethernet features
-  hosts: all
+- hosts: all
   tasks:
-    - name: Configure ethernet features
-      include_role:
+    - include_role:
         name: linux-system-roles.network
       vars:
         network_connections:
@@ -12,5 +10,5 @@
             state: up
             type: ethernet
             ip:
-              dhcp4: false
-              auto6: false
+              dhcp4: "no"
+              auto6: "no"

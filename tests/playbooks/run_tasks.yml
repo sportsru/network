@@ -3,5 +3,4 @@
 - name: Run the tasklist {{ task }}
   hosts: all
   tasks:
-    - name: Include the task '{{ task }}'
-      include_tasks: "{{ task }}"
+    - include_tasks: "{{ task }}"
